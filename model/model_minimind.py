@@ -394,6 +394,7 @@ class MiniMindModel(nn.Module):
                 attention_mask: Optional[torch.Tensor] = None,
                 past_key_values: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None,
                 use_cache: bool = False,
+                position_ids: Optional[torch.Tensor] = None,
                 **kwargs):
         batch_size, seq_length = input_ids.shape
         if hasattr(past_key_values, 'layers'): past_key_values = None
@@ -402,11 +403,16 @@ class MiniMindModel(nn.Module):
 
         hidden_states = self.dropout(self.embed_tokens(input_ids))
 
-        position_embeddings = (
-            self.freqs_cos[start_pos:start_pos + seq_length],
-            self.freqs_sin[start_pos:start_pos + seq_length]
-        )
-
+        if position_ids is not None:
+            position_embeddings = (
+                self.freqs_cos[position_ids, :],
+                self.freqs_sin[position_ids, :]
+            )
+        else:
+            position_embeddings = (
+                self.freqs_cos[start_pos: start_pos + seq_length, :],
+                self.freqs_sin[start_pos: start_pos + seq_length, :]
+            )
         presents = []
         for layer_idx, (layer, past_key_value) in enumerate(zip(self.layers, past_key_values)):
             hidden_states, present = layer(
@@ -440,11 +446,13 @@ class MiniMindForCausalLM(PreTrainedModel, GenerationMixin):
                 labels: Optional[torch.Tensor] = None,
                 past_key_values: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None,
                 use_cache: bool = False,
+                position_ids: Optional[torch.Tensor] = None,
                 logits_to_keep: Union[int, torch.Tensor] = 0,
                 **args):
         hidden_states, past_key_values, aux_loss = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             past_key_values=past_key_values,
             use_cache=use_cache,
             **args
